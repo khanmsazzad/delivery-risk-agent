@@ -1,0 +1,56 @@
+{
+  "name": "Payments Platform",
+  "captured_at": "2026-09-22T10:00:00Z",
+  "work_items": [
+    {
+      "id": "PAY-101",
+      "title": "Implement payment authorization API",
+      "priority": "critical",
+      "status": "blocked",
+      "assignee": "Alice",
+      "created_at": "2026-09-10T09:00:00Z",
+      "due_at": "2026-09-24T17:00:00Z",
+      "blocked_by": ["PAY-102"]
+    },
+    {
+      "id": "PAY-102",
+      "title": "Confirm external provider integration",
+      "priority": "high",
+      "status": "in_progress",
+      "assignee": null,
+      "created_at": "2026-09-12T09:00:00Z",
+      "due_at": "2026-09-23T17:00:00Z",
+      "blocked_by": []
+    },
+    {
+      "id": "PAY-103",
+      "title": "Update payment documentation",
+      "priority": "low",
+      "status": "done",
+      "assignee": "Bob",
+      "created_at": "2026-09-15T09:00:00Z",
+      "due_at": null,
+      "blocked_by": []
+    }
+  ],
+  "pull_requests": [
+    {
+      "number": 42,
+      "title": "Add payment authorization endpoint",
+      "author": "Alice",
+      "created_at": "2026-09-16T10:00:00Z",
+      "linked_work_item": "PAY-101",
+      "approved": false,
+      "ci_passed": false
+    },
+    {
+      "number": 43,
+      "title": "Improve payment documentation",
+      "author": "Bob",
+      "created_at": "2026-09-20T10:00:00Z",
+      "linked_work_item": "PAY-103",
+      "approved": true,
+      "ci_passed": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+[project]
+name = "delivery-risk-agent"
+version = "0.1.0" 
+description =  "An agentic workflow for detecting software delivery risks"
+requires-python = ">=3.11"
+dependencies = [
+	"pydantic",
+]
+
+[project.optional-dependencies]
+dev = [
+     "pytest",
+     "ruff",	
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100 
