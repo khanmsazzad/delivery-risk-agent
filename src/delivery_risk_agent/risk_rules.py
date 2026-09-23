@@ -7,16 +7,12 @@ from delivery_risk_agent.models import (
 )
 
 
-def detect_blocked_critical_work(
-    snapshot: ProjectSnapshot):
+def detect_blocked_critical_work(snapshot: ProjectSnapshot):
 
     findings: list[RiskFinding] = []
 
     for item in snapshot.work_items:
-        if (
-            item.priority == Priority.CRITICAL
-            and item.status == WorkItemStatus.BLOCKED
-        ):
+        if item.priority == Priority.CRITICAL and item.status == WorkItemStatus.BLOCKED:
             findings.append(
                 RiskFinding(
                     rule_id="blocked-critical-work",
@@ -38,21 +34,16 @@ def detect_blocked_critical_work(
     return findings
 
 
-
-def detect_failing_ci(snapshot:ProjectSnapshot):
+def detect_failing_ci(snapshot: ProjectSnapshot):
 
     findings: list[RiskFinding] = []
-    
+
     for pull_request in snapshot.pull_requests:
         if not pull_request.ci_passed:
-            evidence = [
-                f"PR# {pull_request.number} has falling CI"
-            ]
+            evidence = [f"PR# {pull_request.number} has falling CI"]
             if not pull_request.approved:
-                evidence.append(
-                    f"PR #{pull_request.number} is not approved"
-                )
-        
+                evidence.append(f"PR #{pull_request.number} is not approved")
+
             findings.append(
                 RiskFinding(
                     rule_id="failing-ci",
@@ -62,15 +53,16 @@ def detect_failing_ci(snapshot:ProjectSnapshot):
                     pull_request_number=pull_request.number,
                     evidence=evidence,
                     recommendation=(
-                        "Investigate the failing checks before merging "
-                        "or approving the release."
+                        "Investigate the failing checks before merging or approving the release."
                     ),
                 )
             )
-    return findings 
+    return findings
 
 
-def detect_unassigned_high_priority_work(snapshot: ProjectSnapshot,):
+def detect_unassigned_high_priority_work(
+    snapshot: ProjectSnapshot,
+):
     findings: list[RiskFinding] = []
 
     for item in snapshot.work_items:
@@ -99,5 +91,17 @@ def detect_unassigned_high_priority_work(snapshot: ProjectSnapshot,):
                     ),
                 )
             )
+
+    return findings
+
+
+def analyze_project(snapshot: ProjectSnapshot):
+
+    findings = []
+    # extend() takes every element from that returned list and adds it to findings
+    # append() will create a nested list
+    findings.extend(detect_blocked_critical_work(snapshot))
+    findings.extend(detect_unassigned_high_priority_work(snapshot))
+    findings.extend(detect_failing_ci(snapshot))
 
     return findings

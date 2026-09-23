@@ -10,6 +10,7 @@ class Priority(StrEnum):
     HIGH = "high"
     CRITICAL = "critical"
 
+
 class RiskSeverity(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
@@ -50,7 +51,6 @@ class ProjectSnapshot(BaseModel):
     captured_at: datetime
     work_items: list[WorkItem] = Field(default_factory=list)
     pull_requests: list[PullRequest] = Field(default_factory=list)
-
 
 
 class RiskFinding(BaseModel):
