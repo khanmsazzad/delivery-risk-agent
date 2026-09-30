@@ -4,6 +4,7 @@ Version: 0.1.0
 Summary: An agentic workflow for detecting software delivery risks
 Requires-Python: >=3.11
 Requires-Dist: pydantic
+Requires-Dist: openai-agents
 Provides-Extra: dev
 Requires-Dist: pytest; extra == "dev"
 Requires-Dist: ruff; extra == "dev"

@@ -1,1 +1,1 @@
-delivery-risk-agent
+delivery_risk_agent

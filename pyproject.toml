@@ -5,6 +5,7 @@ description =  "An agentic workflow for detecting software delivery risks"
 requires-python = ">=3.11"
 dependencies = [
 	"pydantic",
+     "openai-agents",
 ]
 
 [project.optional-dependencies]
