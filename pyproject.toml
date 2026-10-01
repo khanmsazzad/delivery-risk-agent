@@ -17,6 +17,9 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+    "integration: tests requiring the local llama.cpp server",
+]
 
 [tool.ruff]
 line-length = 100 

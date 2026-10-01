@@ -61,3 +61,22 @@ class RiskFinding(BaseModel):
     pull_request_number: int | None = None
     evidence: list[str] = Field(default_factory=list)
     recommendation: str
+
+class PrioritizedRisk(BaseModel):
+    rank: int
+    title: str
+    severity: RiskSeverity
+    impact: str
+    evidence: list[str]
+
+
+class RecommendedAction(BaseModel):
+    priority: int
+    action: str
+    rationale: str
+
+
+class DeliveryRiskAssessment(BaseModel):
+    executive_summary: str
+    prioritized_risks: list[PrioritizedRisk] 
+    recommended_actions: list[RecommendedAction] 
