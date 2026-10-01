@@ -1,10 +1,10 @@
 import argparse
 import asyncio
+import json
 from pathlib import Path
 
 from agents import (
     Agent,
-    ModelSettings,
     Runner,
     set_default_openai_api,
     set_default_openai_client,
@@ -12,12 +12,14 @@ from agents import (
 )
 from openai import AsyncOpenAI
 
-from delivery_risk_agent.agent_tools import (
-    analyze_delivery_risks,
-)
 from delivery_risk_agent.models import (
+    AgentAdvice,
     DeliveryRiskAssessment,
+    PrioritizedRisk,
+    ProjectSnapshot,
+    RecommendedAction,
 )
+from delivery_risk_agent.risk_rules import analyze_project
 
 local_client = AsyncOpenAI(
     base_url="http://localhost:8080/v1",
@@ -37,48 +39,119 @@ delivery_risk_agent = Agent(
     model="qwen-local",
     instructions=(
         "You are an engineering delivery risk advisor. "
-        "Always use the analyze_delivery_risks tool before making conclusions. "
-        "Use only the findings returned by the tool. "
-        "Include every finding returned by the tool. "
-        "Copy each finding's title, severity, and evidence exactly. "
-        "Never calculate, change, downgrade, or upgrade a severity. "
-        "Rank risks from most important to least important. "
-        "Every recommended action must address a detected risk. "
-        "Do not invent missing facts."
+        "You will receive numbered, authoritative risk findings. "
+        "Return exactly one risk_advice item for each finding_id. "
+        "Explain its likely delivery impact and recommend a concrete action. "
+        "Order risk_advice by your recommended priority. "
+        "Use only the supplied evidence; do not invent project facts. "
+        "Do not assign severity, rewrite evidence, or create new findings."
     ),
-    tools=[analyze_delivery_risks],
-    output_type=DeliveryRiskAssessment, 
-    model_settings=ModelSettings(
-        tool_choice="required",
-    ),
+    output_type=AgentAdvice, 
+    
 )
 
 
 async def generate_assessment(
         snapshot_file: Path, 
 ) -> DeliveryRiskAssessment: 
+
+    # 1. Python loads the snapshot and detects risks.
+    snapshot = ProjectSnapshot.model_validate_json(
+        snapshot_file.read_text(encoding="utf-8")
+    )
+    findings = analyze_project(snapshot)
+
+    # 2. Give each finding a unique number for this assessment.
+    numbered_findings = [
+        {
+            "finding_id": number,
+            **finding.model_dump(mode="json"),
+        }
+        for number, finding in enumerate(findings, start=1)
+    ]
+
     request = (
-         f"Analyze the project snapshot at {snapshot_file}. "
-        "Give me an executive summary, prioritized risks, "
-        "and recommended next actions."
+         "Assess these authoritative delivery-risk findings. "
+        "Return one risk_advice item for every finding_id. "
+        "Order the items by your recommended priority.\n\n"
+        + json.dumps(numbered_findings, indent=2)
     )
 
-    result = await Runner.run(
-        delivery_risk_agent, 
-        request,
-    )
+    # 3. The agent supplies impact analysis and recommendations.
+    result = await Runner.run(delivery_risk_agent, request)
+    advice = result.final_output
 
-    assessment = result.final_output
+    if not isinstance(advice, AgentAdvice):
+        raise TypeError("The agent did not return AgentAdvice.")
 
-    if not isinstance(
-        assessment,
-        DeliveryRiskAssessment
-    ): 
-        raise TypeError(
-            "The agend did not return a valid " \
-            "DeliveryRiskAssessment"
+    # 4. Verify that the agent addressed every detected finding once.
+    expected_ids = set(range(1, len(findings) + 1))
+    returned_ids = [
+        item.finding_id
+        for item in advice.risk_advice
+    ]
+
+    if (
+        len(returned_ids) != len(findings)
+        or set(returned_ids) != expected_ids
+    ):
+        raise ValueError(
+            "Agent advice is missing, duplicating, "
+            "or inventing a finding."
         )
-    return assessment
+
+    findings_by_id = {
+        number: finding
+        for number, finding in enumerate(findings, start=1)
+    }
+
+
+    # 5. Python enforces severity order. Within a severity,
+    # the agent's preferred order is preserved.
+    severity_order = {
+        "critical": 0,
+        "high": 1,
+        "medium": 2,
+        "low": 3,
+    }
+
+    ordered_advice = sorted(
+        advice.risk_advice,
+        key=lambda item: severity_order[
+            findings_by_id[item.finding_id].severity.value
+        ],
+    )
+
+    prioritized_risks = []
+    recommended_actions = []
+
+    # 6. Python combines authoritative facts with agent advice.
+    for rank, item in enumerate(ordered_advice, start=1):
+        finding = findings_by_id[item.finding_id]
+
+        prioritized_risks.append(
+            PrioritizedRisk(
+                rank=rank,
+                title=finding.title,
+                severity=finding.severity,
+                impact=item.impact,
+                evidence=finding.evidence,
+            )
+        )
+
+        recommended_actions.append(
+            RecommendedAction(
+                priority=rank,
+                action=item.recommended_action,
+                rationale=item.rationale,
+            )
+        )
+
+    return DeliveryRiskAssessment(
+        executive_summary=advice.executive_summary,
+        prioritized_risks=prioritized_risks,
+        recommended_actions=recommended_actions,
+    )
 
 async def run_agent(snapshot_file: Path) -> None:
     assessment = await generate_assessment(

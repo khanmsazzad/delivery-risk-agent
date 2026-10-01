@@ -80,3 +80,15 @@ class DeliveryRiskAssessment(BaseModel):
     executive_summary: str
     prioritized_risks: list[PrioritizedRisk] 
     recommended_actions: list[RecommendedAction] 
+
+
+
+class RiskAdvice(BaseModel):
+    finding_id: int
+    impact: str
+    recommended_action: str
+    rationale: str
+
+class AgentAdvice(BaseModel):
+    executive_summary: str
+    risk_advice: list[RiskAdvice]
