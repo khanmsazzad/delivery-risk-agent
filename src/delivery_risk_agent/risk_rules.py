@@ -40,7 +40,7 @@ def detect_failing_ci(snapshot: ProjectSnapshot):
 
     for pull_request in snapshot.pull_requests:
         if not pull_request.ci_passed:
-            evidence = [f"PR# {pull_request.number} has falling CI"]
+            evidence = [f"PR# {pull_request.number} has failing CI"]
             if not pull_request.approved:
                 evidence.append(f"PR #{pull_request.number} is not approved")
 
