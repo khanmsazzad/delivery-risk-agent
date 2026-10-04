@@ -40,6 +40,19 @@ def fetch_github_snapshot(
         )
 
         checks = get_json(checks_url)["check_runs"]
+
+        failed_checks = [
+            f"{check['name']} ({check['conclusion']})"
+            for check in checks
+                if check["conclusion"] in {
+                    "failure",
+                    "timed_out",
+                    "cancelled",
+                    "action_required",
+                    "startup_failure",
+                }
+        ]
+
         check_state = summarize_checks(checks)
 
         # Pending and unknown remain None, so they cannot
@@ -63,6 +76,7 @@ def fetch_github_snapshot(
                 linked_work_item=None,
                 approved=None,
                 ci_passed=ci_passed,
+                failed_checks=failed_checks,
             )
         )
 

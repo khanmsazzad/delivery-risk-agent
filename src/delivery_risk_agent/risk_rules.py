@@ -44,6 +44,11 @@ def detect_failing_ci(snapshot: ProjectSnapshot):
             if pull_request.approved is False:
                 evidence.append(f"PR #{pull_request.number} is not approved")
 
+            evidence.extend(
+                f"GitHub check: {check}"
+                for check in pull_request.failed_checks
+            )
+
             findings.append(
                 RiskFinding(
                     rule_id="failing-ci",
