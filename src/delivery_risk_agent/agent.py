@@ -59,6 +59,14 @@ async def generate_assessment(
     snapshot = ProjectSnapshot.model_validate_json(
         snapshot_file.read_text(encoding="utf-8")
     )
+
+    return await generate_assessment_from_snapshot(snapshot)
+
+
+async def generate_assessment_from_snapshot(
+        snapshot: ProjectSnapshot,
+) -> DeliveryRiskAssessment: 
+
     findings = analyze_project(snapshot)
 
     # 2. Give each finding a unique number for this assessment.

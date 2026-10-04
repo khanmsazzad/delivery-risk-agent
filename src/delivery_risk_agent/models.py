@@ -42,8 +42,9 @@ class PullRequest(BaseModel):
     author: str
     created_at: datetime
     linked_work_item: str | None = None
-    approved: bool = False
-    ci_passed: bool = False
+    approved: bool | None = None
+    ci_passed: bool | None = None
+    failed_checks: list[str] = Field(default_factory=list)
 
 
 class ProjectSnapshot(BaseModel):

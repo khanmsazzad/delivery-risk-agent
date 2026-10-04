@@ -39,10 +39,15 @@ def detect_failing_ci(snapshot: ProjectSnapshot):
     findings: list[RiskFinding] = []
 
     for pull_request in snapshot.pull_requests:
-        if not pull_request.ci_passed:
-            evidence = [f"PR# {pull_request.number} has falling CI"]
-            if not pull_request.approved:
+        if pull_request.ci_passed is False:
+            evidence = [f"PR# {pull_request.number} has failing CI"]
+            if pull_request.approved is False:
                 evidence.append(f"PR #{pull_request.number} is not approved")
+
+            evidence.extend(
+                f"GitHub check: {check}"
+                for check in pull_request.failed_checks
+            )
 
             findings.append(
                 RiskFinding(
