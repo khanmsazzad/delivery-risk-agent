@@ -94,7 +94,7 @@ async def analyze_github(
     try:
         assessment = await asyncio.wait_for(
             generate_assessment_from_snapshot(snapshot),
-            timeout=120,
+            timeout=600,
         )
     except (TimeoutError, APITimeoutError) as error:
         raise HTTPException(

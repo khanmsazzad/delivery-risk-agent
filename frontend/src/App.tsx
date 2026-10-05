@@ -1,91 +1,158 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import './App.css'
 
-type RiskFinding = {
-  rule_id: string
+type PrioritizedRisk = {
+  rank: number
   title: string
   severity: 'low' | 'medium' | 'high' | 'critical'
-  work_item_id: string | null
-  pull_request_number: number | null
+  impact: string
   evidence: string[]
-  recommendation: string
 }
 
-type DashboardResponse = {
+type RecommendedAction = {
+  priority: number
+  action: string
+  rationale: string
+}
+
+type GitHubAnalysisResponse = {
   project_name: string
   captured_at: string
-  findings: RiskFinding[]
+  assessment: {
+    executive_summary: string
+    prioritized_risks: PrioritizedRisk[]
+    recommended_actions: RecommendedAction[]
+  }
 }
 
 function App() {
-  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null)
+  const [repositoryUrl, setRepositoryUrl] = useState('')
+  const [result, setResult] = useState<GitHubAnalysisResponse | null>(null)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const controller = new AbortController()
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setLoading(true)
+    setError(null)
+    setResult(null)
 
-    async function loadDashboard() {
-      try {
-        const response = await fetch('/api/dashboard', {
-          signal: controller.signal,
-        })
+    try {
+      const response = await fetch('/api/analyze/github', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          repository_url: repositoryUrl.trim(),
+        }),
+      })
 
-        if (!response.ok) {
-          throw new Error(`Dashboard request failed (${response.status})`)
+      if (!response.ok) {
+        const errorBody: unknown = await response.json().catch(() => null)
+        let message = `Analysis failed (${response.status})`
+
+        if (
+          typeof errorBody === 'object' &&
+          errorBody !== null &&
+          'detail' in errorBody &&
+          typeof errorBody.detail === 'string'
+        ) {
+          message = errorBody.detail
         }
 
-        const data: DashboardResponse = await response.json()
-
-        if (!controller.signal.aborted) {
-          setDashboard(data)
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setError(
-            error instanceof Error ? error.message : 'Unable to load dashboard',
-          )
-        }
+        throw new Error(message)
       }
+
+      const data: GitHubAnalysisResponse = await response.json()
+      setResult(data)
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Unable to analyze repository',
+      )
+    } finally {
+      setLoading(false)
     }
-
-    void loadDashboard()
-
-    return () => controller.abort()
-  }, [])
-
-  if (error) {
-    return <main><p role="alert">{error}</p></main>
-  }
-
-  if (!dashboard) {
-    return <main><p>Loading dashboard…</p></main>
   }
 
   return (
     <main>
-      <h1>{dashboard.project_name}</h1>
-      <p>
-        Snapshot captured: {new Date(dashboard.captured_at).toLocaleString()}
-      </p>
-      <p>Total findings: {dashboard.findings.length}</p>
+      <h1>Delivery Risk Dashboard</h1>
+      <p>Analyze CI risks in the first five open PRs of a public GitHub repository.</p>
 
-      {dashboard.findings.length === 0 ? (
-        <p>No delivery risks detected.</p>
-      ) : (
-        dashboard.findings.map((finding, index) => (
-          <article key={`${finding.rule_id}-${index}`}>
-            <h2>{finding.title}</h2>
-            <p><strong>Severity:</strong> {finding.severity}</p>
+      <form onSubmit={handleSubmit}>
+        <label htmlFor="repository-url">GitHub repository URL</label>
+        <input
+          id="repository-url"
+          type="url"
+          placeholder="https://github.com/owner/repo"
+          value={repositoryUrl}
+          onChange={(event) => setRepositoryUrl(event.target.value)}
+          required
+          disabled={loading}
+        />
+        <button
+          type="submit"
+          disabled={loading || !repositoryUrl.trim()}
+        >
+          {loading ? 'Analyzing…' : 'Analyze repository'}
+        </button>
+      </form>
 
-            <ul>
-              {finding.evidence.map((item, evidenceIndex) => (
-                <li key={evidenceIndex}>{item}</li>
+      {loading && (
+        <p role="status">
+          Fetching GitHub checks and generating AI advice. This may take a 5 - 10 minutes.
+        </p>
+      )}
+
+      {error && <p role="alert">{error}</p>}
+
+      {result && (
+        <section>
+          <h2>{result.project_name}</h2>
+          <p>
+            Snapshot captured: {new Date(result.captured_at).toLocaleString()}
+          </p>
+
+          <h3>Executive summary</h3>
+          <p>{result.assessment.executive_summary}</p>
+
+          <h3>Detected risks</h3>
+          <p>Total findings: {result.assessment.prioritized_risks.length}</p>
+
+          {result.assessment.prioritized_risks.length === 0 ? (
+            <p>
+              No risks detected by the current rules in the inspected PRs.
+              This is a limited check, not a complete repository assessment.
+            </p>
+          ) : (
+            result.assessment.prioritized_risks.map((risk) => (
+              <article key={risk.rank}>
+                <h2>{risk.rank}. {risk.title}</h2>
+                <p><strong>Severity:</strong> {risk.severity}</p>
+                <p><strong>Potential impact:</strong> {risk.impact}</p>
+                <ul>
+                  {risk.evidence.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </article>
+            ))
+          )}
+
+          {result.assessment.recommended_actions.length > 0 && (
+            <>
+              <h3>Recommended actions</h3>
+              {result.assessment.recommended_actions.map((action) => (
+                <article key={action.priority}>
+                  <h2>{action.priority}. {action.action}</h2>
+                  <p>{action.rationale}</p>
+                </article>
               ))}
-            </ul>
-
-            <p><strong>Recommendation:</strong> {finding.recommendation}</p>
-          </article>
-        ))
+            </>
+          )}
+        </section>
       )}
     </main>
   )
