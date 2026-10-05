@@ -1,32 +1,31 @@
-# React + TypeScript + Vite
+# Delivery Risk Dashboard Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A React + TypeScript frontend built with Vite. It displays project details,
+risk severity, evidence, and recommendations from the FastAPI backend.
 
-Currently, two official plugins are available:
+See the [project README](../README.md#run-the-dashboard-locally) for instructions
+on running the backend and frontend together.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Local development
 
-## React Compiler
+From this directory:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+npm ci
+npm run dev
 
-## Expanding the Oxlint configuration
+Open the URL printed by Vite, usually http://localhost:5173.
+The FastAPI backend must also be running on port 8000.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+During development, Vite forwards `/api` requests to the backend.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+## Checks
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+npm run build
+npm run lint
+
+The build command checks TypeScript and creates production files in `dist/`.
+
+## Current scope
+
+The dashboard displays findings from `data/sample_project.json`.
+Live GitHub data and AI advice are not connected to the frontend yet.

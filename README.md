@@ -12,6 +12,7 @@ Python rules detect risks and assign severity. A local AI advisor explains their
 - Detects pull requests with failing CI
 - Reads open pull requests and check runs from public GitHub repositories
 - Includes synthetic sample data and automated tests
+- Displays sample-project risk findings in a React + TypeScript dashboard backed by FastAPI
 
 ## How the workflow works
 
@@ -38,6 +39,55 @@ Run the deterministic report without starting a model:
 ```bash
 python -m delivery_risk_agent.report data/sample_project.json
 ```
+
+## Run the dashboard locally
+
+The dashboard uses a FastAPI backend and a React + TypeScript frontend.
+It analyzes `data/sample_project.json` using the existing Python risk rules.
+The local AI model is not required.
+
+First, complete the Python installation described above. You also need
+Node.js and npm installed.
+
+### Start the backend
+
+From the repository root, with your virtual environment activated:
+
+```bash
+python -m uvicorn delivery_risk_agent.api:app --reload
+```
+
+- Dashboard API: http://localhost:8000/api/dashboard
+- Interactive API documentation: http://localhost:8000/docs
+
+### Start the frontend
+
+Open a second terminal and run these commands from the repository root:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open the local URL printed by Vite, usually http://localhost:5173.
+
+Keep both servers running. Vite serves the frontend and forwards `/api`
+requests to FastAPI during development.
+
+The sample dashboard displays three findings: one critical and two high.
+
+### Check the frontend
+
+From the `frontend` directory:
+
+```bash
+npm run build
+npm run lint
+```
+
+The build command checks TypeScript and creates production frontend files
+in `frontend/dist/`.
 
 ## Run the local AI advisor
 
@@ -101,3 +151,4 @@ RUN_AGENT_TESTS=1 pytest -v -m integration
 - It reads GitHub check runs. Pending or unknown results are not treated as failed CI.
 - GitHub review status and links to work items are not fetched yet.
 - Impact explanations and actions are AI-generated suggestions for a person to review. Python rules remain the source of truth for detected risks, severity, and evidence.
+- The dashboard currently uses a fixed sample snapshot; live GitHub data and AI advice are available through the CLI workflows only.
