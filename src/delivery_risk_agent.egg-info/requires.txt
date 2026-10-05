@@ -1,6 +1,0 @@
-pydantic
-openai-agents
-
-[dev]
-pytest
-ruff

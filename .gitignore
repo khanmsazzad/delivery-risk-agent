@@ -5,3 +5,9 @@ __pycache__/
 *.pyc
 .env
 *.gguf
+
+# macOS metadata
+.DS_Store
+
+# Generated Python package metadata
+*.egg-info/
