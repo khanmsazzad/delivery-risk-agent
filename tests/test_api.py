@@ -107,7 +107,8 @@ def test_github_analysis_handles_repository_not_found():
 
     assert response.status_code == 502
     assert response.json()["detail"] == (
-        "Repository not found or not publicly accessible."
+        "Repository not found or inaccessible. For private repositories, "
+        "check the backend token's repository access."
     )
     generate_assessment.assert_not_awaited()
 

@@ -3,17 +3,28 @@ import json
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+import os
+from pathlib import Path
 
-def get_json(url: str): 
-    request = Request(
-        url, 
-        headers = {
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "delivery-risk-agent",
-        }
-    )
+from dotenv import load_dotenv
 
-    with urlopen(request, timeout=15) as response: 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+def get_json(url: str):
+    load_dotenv(PROJECT_ROOT / ".env")
+
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "delivery-risk-agent",
+    }
+
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    request = Request(url, headers=headers)
+
+    with urlopen(request, timeout=15) as response:
         return json.load(response)
 
 def summarize_checks(checks: list[dict]) -> str:

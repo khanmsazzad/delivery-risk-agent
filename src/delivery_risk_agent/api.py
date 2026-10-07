@@ -78,10 +78,18 @@ async def analyze_github(
             fetch_github_snapshot, owner, repo
         )
     except HTTPError as error:
-        if error.code == 404:
-            detail = "Repository not found or not publicly accessible."
+        if error.code == 401:
+            detail = "GitHub authentication failed. Check the backend token."
+        elif error.code == 404:
+            detail = (
+                "Repository not found or inaccessible. For private repositories, "
+                "check the backend token's repository access."
+            )
         elif error.code in {403, 429}:
-            detail = "GitHub denied the request or its rate limit was reached."
+            detail = (
+                "GitHub denied the request. Check token permissions, "
+                "organization approval, and API rate limits."
+            )
         else:
             detail = "GitHub could not complete the request."
 

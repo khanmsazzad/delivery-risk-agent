@@ -1,99 +1,141 @@
 # Engineering Delivery Risk Agent
 
-An agentic workflow that identifies software delivery risks from project snapshots and public GitHub pull requests.
+A local dashboard that analyzes delivery risks from public GitHub pull
+requests and Jira Cloud issues.
 
-Python rules detect risks and assign severity. A local AI advisor explains their potential delivery impact and recommends actions. The final assessment preserves the findings and severity determined by the rules.
+Python rules detect risks and assign severity. A local AI advisor explains
+potential delivery impact and recommends actions. Python preserves the
+original findings, severity, and evidence in the final assessment.
 
-## Current capabilities
+## What it analyzes
 
-- Validates project snapshots with Pydantic
-- Detects blocked critical work
-- Detects unassigned high-priority work
-- Detects pull requests with failing CI
-- Reads open pull requests and check runs from public GitHub repositories
-- Includes synthetic sample data and automated tests
-- Displays sample-project risk findings in a React + TypeScript dashboard backed by FastAPI
+- GitHub: failing CI in the first five open pull requests.
+- Jira: unassigned, unfinished high-priority work in an accessible project.
+- JSON snapshots: blocked critical work, unassigned high-priority work,
+  and failing CI.
 
-## How the workflow works
+GitHub and Jira have separate dashboard panels, with independent results,
+loading messages, and errors.
 
-1. Load a JSON snapshot or build one from GitHub PR data.
-2. Run deterministic Python rules to detect risks.
-3. Send the findings to a local advisor agent for impact analysis and recommended actions.
-4. Check that the agent addressed every finding.
-5. Build the final assessment using the original severity and evidence.
+## Requirements
 
-The agent can advise on a risk, but it cannot change the severity assigned by the Python rules.
+- Python 3.11 or newer
+- Node.js 22.12 or newer, with npm
+- Git
+- llama.cpp with the `llama-server` command available
+- Internet access for GitHub, Jira, and the initial model download
+- Optional: a Jira Cloud account and API token for Jira analysis
 
-## Run locally
+The local model requires several GB of disk space and sufficient memory
+to load a quantized 7B model. Generation speed depends on your hardware.
 
-Create a virtual environment and install the project:
+## Install the project
+
+Clone the repository and enter its directory:
+
+```bash
+git clone <YOUR_REPOSITORY_URL> delivery-risk-agent
+cd delivery-risk-agent
+```
+
+Create and activate a Python virtual environment:
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
 ```
 
-Run the deterministic report without starting a model:
+macOS/Linux:
 
 ```bash
-python -m delivery_risk_agent.report data/sample_project.json
+source .venv/bin/activate
 ```
+
+Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Install Python and frontend dependencies:
+
+```bash
+python -m pip install -e ".[dev]"
+npm --prefix frontend ci
+```
+
+## Optional: configure private GitHub access
+
+Public repositories can be analyzed without a GitHub token.
+
+To analyze private repositories, create a fine-grained personal access
+token in GitHub:
+
+1. Open GitHub Settings → Developer settings → Personal access tokens
+   → Fine-grained tokens.
+2. Select the repository owner and repositories you want to analyze.
+3. Grant these repository permissions:
+   - Pull requests: Read
+   - Checks: Read
+4. Generate the token and add it to `.env` in the repository root:
+
+    GITHUB_TOKEN=your_github_token
+
+If `.env` already contains Jira configuration, add this line to the
+existing file.
+
+The token must have access to the private repository. Organization-owned
+repositories may also require approval.
+
+Restart the backend after changing configuration.
+
+Without a token, requests use public unauthenticated access. With a token,
+requests use authenticated access. An invalid or expired token can cause
+requests to fail even for public repositories.
+
+Keep the token in the backend configuration. Never commit `.env` or put
+the token in frontend code.
+
+## Optional: configure Jira Cloud
+
+Skip this section if you only want GitHub analysis.
+
+Create an API token without scopes using your Atlassian account:
+https://id.atlassian.com/manage-profile/security/api-tokens
+
+Create `.env` in the repository root:
+
+```dotenv
+JIRA_BASE_URL=https://your-site.atlassian.net
+JIRA_EMAIL=you@example.com
+JIRA_API_TOKEN=your_api_token
+JIRA_PROJECT_KEY=YOUR_PROJECT_KEY
+```
+
+The configured account must be able to read the project's issues.
+
+The dashboard accepts a project key, such as `RISK`. It uses the Jira site
+and credentials configured in the backend. `JIRA_PROJECT_KEY` is used by
+the Jira command-line reader.
+
+Keep `.env` private. It is excluded from Git. Never put the token in
+frontend code.
 
 ## Run the dashboard locally
 
-The dashboard uses a FastAPI backend and a React + TypeScript frontend.
-It analyzes `data/sample_project.json` using the existing Python risk rules.
-The local AI model is not required.
+Keep three terminals running.
 
-First, complete the Python installation described above. You also need
-Node.js and npm installed.
+### Terminal 1: local AI model
 
-### Start the backend
+Install llama.cpp using its installation guide:
+https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md
 
-From the repository root, with your virtual environment activated:
+On macOS with Homebrew:
 
 ```bash
-python -m uvicorn delivery_risk_agent.api:app --reload
+brew install llama.cpp
 ```
 
-- Dashboard API: http://localhost:8000/api/dashboard
-- Interactive API documentation: http://localhost:8000/docs
-
-### Start the frontend
-
-Open a second terminal and run these commands from the repository root:
-
-```bash
-cd frontend
-npm ci
-npm run dev
-```
-
-Open the local URL printed by Vite, usually http://localhost:5173.
-
-Keep both servers running. Vite serves the frontend and forwards `/api`
-requests to FastAPI during development.
-
-The sample dashboard displays three findings: one critical and two high.
-
-### Check the frontend
-
-From the `frontend` directory:
-
-```bash
-npm run build
-npm run lint
-```
-
-The build command checks TypeScript and creates production frontend files
-in `frontend/dist/`.
-
-## Run the local AI advisor
-
-The advisor uses the OpenAI Agents SDK and a local Qwen model served through llama.cpp's OpenAI-compatible API.
-
-Start the model server in one terminal:
+Start the model server:
 
 ```bash
 llama-server \
@@ -104,51 +146,159 @@ llama-server \
   --port 8080
 ```
 
-In another terminal, activate the virtual environment and run:
+On Windows, enter the command on one line.
+
+The first run downloads the model. Wait until the server is ready before
+submitting an analysis.
+
+The application connects to `http://localhost:8080/v1` and uses the model
+alias `qwen-local`. No OpenAI API key is required.
+
+This command uses CPU inference. Analysis has taken around five minutes
+on the development machine; other machines may be faster or slower.
+
+### Terminal 2: FastAPI backend
+
+From the repository root, activate the virtual environment and run:
 
 ```bash
-python -m delivery_risk_agent.agent data/sample_project.json
+python -m uvicorn delivery_risk_agent.api:app --reload
 ```
 
-The local setup does not require an OpenAI API key.
+Interactive API documentation:
+http://localhost:8000/docs
 
-## Analyze public GitHub pull requests
+### Terminal 3: React frontend
 
-Inspect open PRs and their check runs:
+From the repository root:
 
 ```bash
-python -m delivery_risk_agent.github_reader fastapi fastapi
+npm --prefix frontend run dev
 ```
 
-Build a snapshot from GitHub and run the advisor:
+Open the URL printed by Vite, usually http://localhost:5173.
+
+During development, Vite forwards `/api` requests to the backend on port
+8000.
+
+## Use the dashboard
+
+### GitHub
+
+1. Enter a repository URL, such as `https://github.com/owner/repo`.
+   Public repositories work without a token. Private repositories require
+   the backend token to have access.
+2. Click **Analyze GitHub**.
+3. Wait for the assessment to appear in the GitHub panel.
+
+The application reads the first five open PRs and their GitHub check runs.
+
+### Jira
+
+1. Complete the Jira configuration above.
+2. Enter a project key, such as `RISK`.
+3. Click **Analyze Jira**.
+4. Wait for the assessment to appear in the Jira panel.
+
+The application follows pagination to read accessible project issues.
+
+Each assessment shows a summary, risks, evidence, potential impact,
+and recommended actions. Jira also shows the number of issues inspected.
+
+## Try the rules without an AI model
+
+From the repository root, with the virtual environment activated:
 
 ```bash
-python -m delivery_risk_agent.github_snapshot fastapi fastapi
+python -m delivery_risk_agent.report data/sample_project.json
 ```
 
-The arguments are the GitHub repository owner and name. For example, [`fastapi/fastapi`](https://github.com/fastapi/fastapi) becomes `fastapi fastapi`.
+The sample produces three findings: one critical and two high.
 
-The GitHub workflow is read-only. It does not modify PRs or repository settings.
+To fetch Jira issues and run only the rules:
+
+```bash
+python -m delivery_risk_agent.jira_reader
+```
+
+This uses `JIRA_PROJECT_KEY` from `.env`.
+
+## API endpoints
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/dashboard` | Rule-only analysis of the bundled sample |
+| POST | `/api/analyze/github` | GitHub analysis with AI advice |
+| POST | `/api/analyze/jira` | Jira analysis with AI advice |
+
+GitHub request:
+
+```json
+{"repository_url": "https://github.com/owner/repo"}
+```
+
+Jira request:
+
+```json
+{"project_key": "RISK"}
+```
 
 ## Run checks
 
-Run the ordinary tests and lint check:
+From the repository root:
 
 ```bash
-pytest -v
+python -m pytest -v -m "not integration"
 ruff check .
+npm --prefix frontend run build
+npm --prefix frontend run lint
 ```
 
-To run the live agent integration test, start llama.cpp first and then run:
+Mocked API and Jira converter tests do not need external services.
+
+To run the live AI integration tests, start the model server first.
+
+macOS/Linux:
 
 ```bash
-RUN_AGENT_TESTS=1 pytest -v -m integration
+RUN_AGENT_TESTS=1 python -m pytest -v -m integration
 ```
 
-## Current scope
+Windows PowerShell:
 
-- The GitHub reader examines the first five open PRs; pagination is not implemented yet.
-- It reads GitHub check runs. Pending or unknown results are not treated as failed CI.
-- GitHub review status and links to work items are not fetched yet.
-- Impact explanations and actions are AI-generated suggestions for a person to review. Python rules remain the source of truth for detected risks, severity, and evidence.
-- The dashboard currently uses a fixed sample snapshot; live GitHub data and AI advice are available through the CLI workflows only.
+```powershell
+$env:RUN_AGENT_TESTS = "1"
+python -m pytest -v -m integration
+Remove-Item Env:RUN_AGENT_TESTS
+```
+
+## Troubleshooting
+
+| Problem | What to check |
+|---|---|
+| npm cannot find `package.json` | Run from `frontend/`, or use `npm --prefix frontend ...` from the root |
+| Local AI advisor unavailable | Confirm llama-server is ready on port 8080 with alias `qwen-local` |
+| Analysis times out | The API allows up to 10 minutes for AI advice; check model-server logs |
+| Jira authentication fails | Check your email, token, expiration, and token type |
+| Jira returns no accessible issues | Check the project key, account permissions, and whether the project has issues |
+| Unsupported Jira priority | Update `PRIORITY_MAPPING` in `jira_reader.py` for your project's names |
+| | GitHub authentication fails | Check whether `GITHUB_TOKEN` is valid and unexpired |
+| GitHub repository inaccessible | Check the URL, token repository access, read permissions, and organization approval |
+| GitHub request denied | Check permissions and API rate limits |
+
+## Current limitations
+
+- GitHub analysis covers only the first five open PRs.
+- GitHub checks that are pending or unknown are not treated as failing.
+- GitHub reviews and linked work items are not fetched.
+- Jira priority mappings currently support Highest, High, Medium, Low,
+  and Lowest.
+- Jira statuses are mapped using status categories. Blocked statuses and
+  blocking links are not mapped yet.
+- AI generation may take several minutes. Concurrent analyses share the
+  same local model server and may take longer.
+- No detected findings means the current rules found nothing in the
+  inspected data; it does not establish that a project has no delivery risks.
+- AI explanations and actions are suggestions for human review.
+- This setup is intended for local use. The API has no application-level
+  authentication.

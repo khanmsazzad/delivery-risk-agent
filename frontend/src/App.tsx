@@ -167,8 +167,10 @@ function App() {
 
       <div className="analysis-grid">
       <section className="analysis-panel" aria-labelledby="github-heading">
-        <h2 id="github-heading">Public GitHub repository</h2>
-        <p>Check CI risks in the first five open pull requests.</p>
+        <h2 id="github-heading">GitHub repository</h2>
+        <p>Check CI risks in the first five open pull requests.
+           Private repositories require a GitHub token configured in the backend.
+        </p>
 
         <form onSubmit={(event) => void analyze(event, 'github')}>
           <label htmlFor="repository-url">Repository URL</label>
