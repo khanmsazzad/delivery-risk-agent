@@ -110,3 +110,41 @@ def test_github_analysis_handles_repository_not_found():
         "Repository not found or not publicly accessible."
     )
     generate_assessment.assert_not_awaited()
+
+
+def test_jira_analysis_returns_assessment():
+    snapshot = ProjectSnapshot.model_validate_json(
+        SAMPLE_SNAPSHOT.read_text(encoding="utf-8")
+    )
+    assessment = DeliveryRiskAssessment(
+        executive_summary="Test Jira assessment",
+        prioritized_risks=[],
+        recommended_actions=[],
+    )
+
+    with (
+        patch(
+            "delivery_risk_agent.api.fetch_jira_snapshot",
+            return_value=snapshot,
+        ) as fetch_snapshot,
+        patch(
+            "delivery_risk_agent.api.generate_assessment_from_snapshot",
+            new_callable=AsyncMock,
+            return_value=assessment,
+        ) as generate_assessment,
+        TestClient(app) as client,
+    ):
+        response = client.post(
+            "/api/analyze/jira",
+            json={"project_key": "risk"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "project_name": snapshot.name,
+        "captured_at": snapshot.model_dump(mode="json")["captured_at"],
+        "issues_inspected": len(snapshot.work_items),
+        "assessment": assessment.model_dump(mode="json"),
+    }
+    fetch_snapshot.assert_called_once_with("RISK")
+    generate_assessment.assert_awaited_once_with(snapshot)

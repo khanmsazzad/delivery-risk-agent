@@ -17,6 +17,7 @@ from delivery_risk_agent.models import (
     RiskFinding,
 )
 from delivery_risk_agent.risk_rules import analyze_project
+from delivery_risk_agent.jira_reader import fetch_jira_snapshot
 
 app = FastAPI(title="Delivery Risk Dashboard")
 
@@ -115,5 +116,97 @@ async def analyze_github(
     return GitHubAnalysisResponse(
         project_name=snapshot.name,
         captured_at=snapshot.captured_at,
+        assessment=assessment,
+    )
+
+
+class JiraAnalysisRequest(BaseModel):
+    project_key: str
+
+
+class JiraAnalysisResponse(BaseModel):
+    project_name: str
+    captured_at: datetime
+    issues_inspected: int
+    assessment: DeliveryRiskAssessment
+
+
+@app.post("/api/analyze/jira", response_model=JiraAnalysisResponse)
+async def analyze_jira(
+    request: JiraAnalysisRequest,
+) -> JiraAnalysisResponse:
+    project_key = request.project_key.strip().upper()
+
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]*", project_key):
+        raise HTTPException(
+            status_code=422,
+            detail="Enter a valid Jira project key",
+        )
+
+    try:
+        snapshot = await run_in_threadpool(
+            fetch_jira_snapshot, project_key
+        )
+    except HTTPError as error:
+        if error.code == 401:
+            detail = "Jira authentication failed. Check the backend credentials."
+        elif error.code == 403:
+            detail = "The configured Jira account does not have access."
+        elif error.code in {400, 404}:
+            detail = "Jira could not find or access the requested project."
+        elif error.code == 429:
+            detail = "Jira's rate limit was reached. Please try again later."
+        else:
+            detail = "Jira could not complete the request."
+
+        raise HTTPException(status_code=502, detail=detail) from error
+    except (URLError, TimeoutError) as error:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to connect to Jira. Please try again.",
+        ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Unable to load Jira issues. Check the backend configuration "
+                "and priority/status mappings."
+            ),
+        ) from error
+
+    if not snapshot.work_items:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No accessible issues were returned for this project. "
+                "Check the project key, permissions, and whether it has issues."
+            ),
+        )
+
+    try:
+        assessment = await asyncio.wait_for(
+            generate_assessment_from_snapshot(snapshot),
+            timeout=600,
+        )
+    except (TimeoutError, APITimeoutError) as error:
+        raise HTTPException(
+            status_code=504,
+            detail="The AI advisor took too long. Please try again.",
+        ) from error
+    except APIConnectionError as error:
+        raise HTTPException(
+            status_code=503,
+            detail="The local AI advisor is unavailable. Start the model server.",
+        ) from error
+    except (APIError, ValueError, TypeError) as error:
+        raise HTTPException(
+            status_code=502,
+            detail="The AI advisor could not produce a valid assessment.",
+        ) from error
+
+    return JiraAnalysisResponse(
+        project_name=snapshot.name,
+        captured_at=snapshot.captured_at,
+        issues_inspected=len(snapshot.work_items),
         assessment=assessment,
     )

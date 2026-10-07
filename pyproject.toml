@@ -8,6 +8,7 @@ dependencies = [
      "openai-agents",
      "fastapi",
      "uvicorn",
+     "python-dotenv",
 ]
 
 [project.optional-dependencies]
